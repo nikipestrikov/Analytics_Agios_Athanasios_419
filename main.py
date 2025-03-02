@@ -47,6 +47,9 @@ def load_data():
     # Convert contract date to datetime
     data['Contract Date'] = pd.to_datetime(data['Contract Date'], dayfirst=True)
 
+    # Clean and convert m² column
+    data['m²'] = pd.to_numeric(data['m²'].str.replace(',', ''), errors='coerce')
+
     # Convert contract amount to numeric
     data['Contract Amount'] = data['Contract Amount'].str.replace(',', '').astype(float)
 
@@ -59,8 +62,8 @@ def load_data():
 
     return data
 
-
 data = load_data()
+
 
 # Add a sidebar with filters
 with st.sidebar:
@@ -90,6 +93,9 @@ with st.sidebar:
         max_price,
         (min_price, max_price)
     )
+    # Market segment filter
+    segments = ["All"] + sorted(data["Market Segment"].unique().tolist())
+    selected_segment = st.selectbox("Select Market Segment", segments)
 
 # Apply filters
 filter_conditions = (
@@ -105,7 +111,21 @@ if selected_project != "All":
 if selected_bedrooms != "All":
     filter_conditions &= (data["Bedrooms"] == selected_bedrooms)
 
+if selected_segment != "All":
+    filter_conditions &= (data["Market Segment"] == selected_segment)
+
 filtered_data = data[filter_conditions]
+
+# Check the type and handle conversion safely
+if pd.api.types.is_string_dtype(filtered_data['m²']):
+    # If it's string type, remove commas and convert to float
+    filtered_data['m²'] = filtered_data['m²'].str.replace(',', '').astype(float)
+elif pd.api.types.is_numeric_dtype(filtered_data['m²']):
+    # If it's already numeric, just ensure it's float type
+    filtered_data['m²'] = filtered_data['m²'].astype(float)
+else:
+    # Handle any other case
+    st.error("Unexpected data type in m² column")
 
 # Create tabs for different dashboard sections
 tab1, tab2, tab3 = st.tabs(["Sales Timeline", "Project Analysis", "Location Map"])
@@ -149,6 +169,56 @@ with tab1:
 
 with tab2:
     st.header("Project Analysis")
+    # Price per sqm statistics
+    st.subheader("Price per m² Statistics")
+
+    # Calculate statistics
+    # Calculate statistics with error handling
+    if not filtered_data.empty:
+        try:
+            price_stats = {
+                "Highest Price per m²": filtered_data['m²'].astype(float).max(),
+                "Lowest Price per m²": filtered_data['m²'].astype(float).min(),
+                "Average Price per m²": filtered_data['m²'].astype(float).mean()
+            }
+
+            # Display metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Highest Price per m²", f"€{price_stats['Highest Price per m²']:,.2f}")
+            with col2:
+                st.metric("Lowest Price per m²", f"€{price_stats['Lowest Price per m²']:,.2f}")
+            with col3:
+                st.metric("Average Price per m²", f"€{price_stats['Average Price per m²']:,.2f}")
+        except Exception as e:
+            st.error(f"Error calculating price statistics: {str(e)}")
+    else:
+        st.warning("No data available for price statistics calculation.")
+
+    # Show details of the highest and lowest transactions
+    st.subheader("Highest & Lowest Price per m² Transactions")
+
+    # Get highest and lowest transactions
+    highest_transaction = filtered_data.loc[filtered_data['m²'].idxmax()]
+    lowest_transaction = filtered_data.loc[filtered_data['m²'].idxmin()]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Highest Price per m² Transaction**")
+        st.write(f"Project: {highest_transaction['Project']}")
+        st.write(f"Unit: {highest_transaction['Unit ID']}")
+        st.write(f"Contract Amount: €{float(highest_transaction['Contract Amount']):,.2f}")
+        st.write(f"Price per m²: €{float(highest_transaction['m²']):,.2f}")
+        st.write(f"Date: {highest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
+
+    with col2:
+        st.markdown("**Lowest Price per m² Transaction**")
+        st.write(f"Project: {lowest_transaction['Project']}")
+        st.write(f"Unit: {lowest_transaction['Unit ID']}")
+        st.write(f"Contract Amount: €{float(lowest_transaction['Contract Amount']):,.2f}")
+        st.write(f"Price per m²: €{float(lowest_transaction['m²']):,.2f}")
+        st.write(f"Date: {lowest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
 
     # Show message if no data after filtering
     if filtered_data.empty:
@@ -250,8 +320,6 @@ with tab2:
                 st.plotly_chart(fig7, use_container_width=True)
         else:
             st.info("No bedroom data available for the selected filters.")
-
-        filtered_data['m²'] = filtered_data['m²'].str.replace(',', '').astype(float)
 
         # Create monthly average price per m²
         monthly_price_m2 = filtered_data.groupby(pd.to_datetime(filtered_data['Contract Date']).dt.strftime('%Y-%m'))[

@@ -1,9 +1,40 @@
 import streamlit as st
 import pandas as pd
+import plotly.io as pio
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import numpy as np
+
+corporate_template = go.layout.Template(
+    layout=go.Layout(
+        plot_bgcolor='#ffffff',
+        paper_bgcolor='#ffffff',
+        font={'color': '#186685'},
+        title={'font': {'color': '#186685'}},
+        colorway=['#186685', '#50adc9', '#e2ecf4'],
+        xaxis={
+            'gridcolor': '#e2ecf4',
+            'linecolor': '#186685',
+            'tickcolor': '#186685',
+            'zerolinecolor': '#e2ecf4'
+        },
+        yaxis={
+            'gridcolor': '#e2ecf4',
+            'linecolor': '#186685',
+            'tickcolor': '#186685',
+            'zerolinecolor': '#e2ecf4'
+        },
+        legend={
+            'bgcolor': '#ffffff',
+            'font': {'color': '#186685'}
+        }
+    )
+)
+
+# Register the template
+pio.templates['corporate'] = corporate_template
+pio.templates.default = 'corporate'
 
 # Set page config for better embedding
 st.set_page_config(
@@ -15,15 +46,91 @@ st.set_page_config(
 # Custom CSS to make it more Notion-friendly
 st.markdown("""
 <style>
+    /* Main container styling */
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
+        background-color: #ffffff;
     }
+
+    /* Headers styling */
     h1, h2, h3 {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #186685;
+        margin-bottom: 1rem;
+    }
+
+    /* Metric value styling */
+    div[data-testid="stMetricValue"] {
+        color: #186685;
+        font-weight: 600;
+    }
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+        border-bottom: 2px solid #e2ecf4;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        color: #186685;
+        border-radius: 4px 4px 0px 0px;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: #186685 !important;
+        color: white !important;
+    }
+
+    /* Chart container styling - main content area only */
+    .main .element-container {
+        background-color: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Metric container styling */
+    div[data-testid="metric-container"] {
+        background-color: #e2ecf4;
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid #50adc9;
+    }
+
+    /* Button styling */
+    .stButton button {
+        background-color: #186685;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .stButton button:hover {
+        background-color: #50adc9;
+    }
+
+    /* Dataframe styling */
+    .dataframe {
+        border: 1px solid #e2ecf4;
+    }
+
+    .dataframe th {
+        background-color: #186685;
+        color: white;
+    }
+
+    .dataframe tr:nth-child(even) {
+        background-color: #e2ecf4;
     }
 </style>
 """, unsafe_allow_html=True)
+
+
 
 # Create two columns for the title and logo
 col1, col2 = st.columns([4, 1])  # The numbers [4, 1] determine the relative width of the columns
@@ -152,7 +259,7 @@ with tab1:
             labels={'Year-Month': 'Month', 'Contract Amount': 'Total Sales (€)'},
             text_auto='.2s'
         )
-        fig.update_layout(xaxis_tickangle=-45, height=500)
+        fig.update_layout(xaxis_tickangle=-45, height=500, template=corporate_template)
         st.plotly_chart(fig, use_container_width=True)
 
         # Line chart for number of units sold
@@ -164,7 +271,7 @@ with tab1:
             labels={'Year-Month': 'Month', 'Unit ID': 'Units Sold'},
             markers=True
         )
-        fig2.update_layout(xaxis_tickangle=-45, height=400)
+        fig2.update_layout(xaxis_tickangle=-45, height=400, template=corporate_template)
         st.plotly_chart(fig2, use_container_width=True)
 
 with tab2:
@@ -174,26 +281,38 @@ with tab2:
 
     # Calculate statistics
     # Calculate statistics with error handling
-    if not filtered_data.empty:
-        try:
-            price_stats = {
-                "Highest Price per m²": filtered_data['m²'].astype(float).max(),
-                "Lowest Price per m²": filtered_data['m²'].astype(float).min(),
-                "Average Price per m²": filtered_data['m²'].astype(float).mean()
-            }
+    try:
+        if not filtered_data.empty:
+            # Remove rows with NaN values in the 'm²' column before finding max/min
+            valid_data = filtered_data.dropna(subset=['m²'])
 
-            # Display metrics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Highest Price per m²", f"€{price_stats['Highest Price per m²']:,.2f}")
-            with col2:
-                st.metric("Lowest Price per m²", f"€{price_stats['Lowest Price per m²']:,.2f}")
-            with col3:
-                st.metric("Average Price per m²", f"€{price_stats['Average Price per m²']:,.2f}")
-        except Exception as e:
-            st.error(f"Error calculating price statistics: {str(e)}")
-    else:
-        st.warning("No data available for price statistics calculation.")
+            if not valid_data.empty:
+                highest_transaction = valid_data.loc[valid_data['m²'].idxmax()]
+                lowest_transaction = valid_data.loc[valid_data['m²'].idxmin()]
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("**Highest Price per m² Transaction**")
+                    st.write(f"Project: {highest_transaction['Project']}")
+                    st.write(f"Unit: {highest_transaction['Unit ID']}")
+                    st.write(f"Contract Amount: €{float(highest_transaction['Contract Amount']):,.2f}")
+                    st.write(f"Price per m²: €{float(highest_transaction['m²']):,.2f}")
+                    st.write(f"Date: {highest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
+
+                with col2:
+                    st.markdown("**Lowest Price per m² Transaction**")
+                    st.write(f"Project: {lowest_transaction['Project']}")
+                    st.write(f"Unit: {lowest_transaction['Unit ID']}")
+                    st.write(f"Contract Amount: €{float(lowest_transaction['Contract Amount']):,.2f}")
+                    st.write(f"Price per m²: €{float(lowest_transaction['m²']):,.2f}")
+                    st.write(f"Date: {lowest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
+            else:
+                st.warning("No valid price per m² data available for the selected filters.")
+        else:
+            st.warning("No data available for the selected filters.")
+    except Exception as e:
+        st.warning(f"Unable to display transaction details. Some data may be missing or invalid.")
 
     # Show details of the highest and lowest transactions
     st.subheader("Highest & Lowest Price per m² Transactions")

@@ -25,8 +25,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Title
-st.title("Local Market Analysis")
+# Create two columns for the title and logo
+col1, col2 = st.columns([4, 1])  # The numbers [4, 1] determine the relative width of the columns
+
+# Put the title in the first (wider) column
+with col1:
+    st.title("Local Market Analysis")  # Replace with your actual title
+
+# Put the logo in the second (narrower) column
+with col2:
+    st.image('logo.png', width=100)  # Adjust the width value to make it smaller
+
 
 # Load data
 @st.cache_data
@@ -241,6 +250,33 @@ with tab2:
                 st.plotly_chart(fig7, use_container_width=True)
         else:
             st.info("No bedroom data available for the selected filters.")
+
+        filtered_data['m²'] = filtered_data['m²'].str.replace(',', '').astype(float)
+
+        # Create monthly average price per m²
+        monthly_price_m2 = filtered_data.groupby(pd.to_datetime(filtered_data['Contract Date']).dt.strftime('%Y-%m'))[
+            ['m²']].mean().reset_index()
+        monthly_price_m2.columns = ['Month', 'Price per m²']
+
+        # Create the figure
+        fig8 = px.line(monthly_price_m2,
+                       x='Month',
+                       y='Price per m²',
+                       title='Average Price per m² Over Time',
+                       markers=True)
+
+        # Customize the layout
+        fig8.update_layout(
+            xaxis_title="Month",
+            yaxis_title="Price (€/m²)",
+            hovermode='x unified'
+        )
+
+        # Update y-axis to show values in euros
+        fig8.update_layout(yaxis=dict(tickprefix="€"))
+
+        # Display the chart
+        st.plotly_chart(fig8, use_container_width=True)
 
 with tab3:
     st.header("Sales Concentration by Project")

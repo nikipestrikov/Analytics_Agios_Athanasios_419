@@ -280,7 +280,6 @@ with tab2:
     st.subheader("Price per m² Statistics")
 
     # Calculate statistics
-    # Calculate statistics with error handling
     try:
         if not filtered_data.empty:
             # Remove rows with NaN values in the 'm²' column before finding max/min
@@ -289,10 +288,26 @@ with tab2:
             if not valid_data.empty:
                 highest_transaction = valid_data.loc[valid_data['m²'].idxmax()]
                 lowest_transaction = valid_data.loc[valid_data['m²'].idxmin()]
+                average_price_per_m2 = valid_data['m²'].mean()
 
-                col1, col2 = st.columns(2)
+                # First show the summary statistics in big numbers
+                col1, col2, col3 = st.columns(3)
 
                 with col1:
+                    st.metric("Highest Price/m²", f"€{float(highest_transaction['m²']):,.2f}")
+
+                with col2:
+                    st.metric("Lowest Price/m²", f"€{float(lowest_transaction['m²']):,.2f}")
+
+                with col3:
+                    st.metric("Average Price/m²", f"€{average_price_per_m2:,.2f}")
+
+                # Then show the detailed transactions
+                st.subheader("Highest & Lowest Price per m² Transactions")
+
+                detail_col1, detail_col2 = st.columns(2)
+
+                with detail_col1:
                     st.markdown("**Highest Price per m² Transaction**")
                     st.write(f"Project: {highest_transaction['Project']}")
                     st.write(f"Unit: {highest_transaction['Unit ID']}")
@@ -300,7 +315,7 @@ with tab2:
                     st.write(f"Price per m²: €{float(highest_transaction['m²']):,.2f}")
                     st.write(f"Date: {highest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
 
-                with col2:
+                with detail_col2:
                     st.markdown("**Lowest Price per m² Transaction**")
                     st.write(f"Project: {lowest_transaction['Project']}")
                     st.write(f"Unit: {lowest_transaction['Unit ID']}")
@@ -313,31 +328,6 @@ with tab2:
             st.warning("No data available for the selected filters.")
     except Exception as e:
         st.warning(f"Unable to display transaction details. Some data may be missing or invalid.")
-
-    # Show details of the highest and lowest transactions
-    st.subheader("Highest & Lowest Price per m² Transactions")
-
-    # Get highest and lowest transactions
-    highest_transaction = filtered_data.loc[filtered_data['m²'].idxmax()]
-    lowest_transaction = filtered_data.loc[filtered_data['m²'].idxmin()]
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**Highest Price per m² Transaction**")
-        st.write(f"Project: {highest_transaction['Project']}")
-        st.write(f"Unit: {highest_transaction['Unit ID']}")
-        st.write(f"Contract Amount: €{float(highest_transaction['Contract Amount']):,.2f}")
-        st.write(f"Price per m²: €{float(highest_transaction['m²']):,.2f}")
-        st.write(f"Date: {highest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
-
-    with col2:
-        st.markdown("**Lowest Price per m² Transaction**")
-        st.write(f"Project: {lowest_transaction['Project']}")
-        st.write(f"Unit: {lowest_transaction['Unit ID']}")
-        st.write(f"Contract Amount: €{float(lowest_transaction['Contract Amount']):,.2f}")
-        st.write(f"Price per m²: €{float(lowest_transaction['m²']):,.2f}")
-        st.write(f"Date: {lowest_transaction['Contract Date'].strftime('%d/%m/%Y')}")
 
     # Show message if no data after filtering
     if filtered_data.empty:
